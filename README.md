@@ -1,6 +1,6 @@
 # Fly Video Filtering
 
-This Python package processes a folder of fly videos to detect objects (presumably flies) within specified frame ranges using OpenCV. It supports two detection methods: thresholding and background subtraction. The script outputs a CSV file listing videos where objects were detected in at least a specified percentage of frames.
+This Python package processes a folder of fly videos to detect flies within specified frame ranges using OpenCV. It supports two detection methods: thresholding and background subtraction. The script outputs a CSV file listing videos where objects were detected in at least a specified percentage of frames.
 
 ## Installation
 
@@ -79,11 +79,3 @@ To run tests:
 ```
 python -m unittest discover tests
 ```
-
-## License
-
-[Your chosen license]
-
-## Contributing
-
-[Your contribution guidelines]
