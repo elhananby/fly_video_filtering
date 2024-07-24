@@ -3,6 +3,7 @@ import os
 from typing import List, Dict, Tuple
 import cv2
 import toml
+import argparse
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QListWidget, QLabel, QSlider, QLineEdit, QFileDialog,
                                QMessageBox, QComboBox)
@@ -11,11 +12,15 @@ from PySide6.QtCore import Qt, QPoint
 
 from fly_video_filtering.utils.annotation import save_annotations, load_annotations
 
+# Predefined colors for automatic assignment
+AUTO_COLORS = ['red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'black', 'white', 
+               'darkRed', 'darkGreen', 'darkBlue', 'darkCyan', 'darkMagenta', 'darkYellow']
+
 class AnnotationGUI(QMainWindow):
     def __init__(self, video_list: List[str], skeleton_config: Dict):
         super().__init__()
         self.video_list = video_list
-        self.skeleton_config = skeleton_config
+        self.skeleton_config = self.process_skeleton_config(skeleton_config)
         self.current_video = None
         self.cap = None
         self.current_frame = 0
@@ -26,6 +31,27 @@ class AnnotationGUI(QMainWindow):
         self.pan_offset = QPoint(0, 0)
 
         self.init_ui()
+
+    def process_skeleton_config(self, config):
+        points = config['fly']['points']
+        used_colors = set()
+        color_index = 0
+
+        for point in points:
+            if 'color' not in point or not point['color']:
+                while color_index < len(AUTO_COLORS):
+                    color = AUTO_COLORS[color_index]
+                    if color not in used_colors:
+                        point['color'] = color
+                        used_colors.add(color)
+                        break
+                    color_index += 1
+                if 'color' not in point:
+                    point['color'] = 'black'  # Fallback if all colors are used
+            else:
+                used_colors.add(point['color'])
+
+        return config
 
     def init_ui(self):
         self.setWindowTitle('Fly Video Annotation')
@@ -45,7 +71,7 @@ class AnnotationGUI(QMainWindow):
 
         # Point selection
         self.point_combo = QComboBox()
-        self.point_combo.addItems([point['name'] for point in self.skeleton_config['fly']['points']])
+        self.point_combo.addItems([f"{point['name']} ({point['color']})" for point in self.skeleton_config['fly']['points']])
         self.point_combo.currentIndexChanged.connect(self.update_current_point)
         left_layout.addWidget(QLabel("Select point to annotate:"))
         left_layout.addWidget(self.point_combo)
@@ -147,7 +173,7 @@ class AnnotationGUI(QMainWindow):
         if self.current_frame not in self.annotations:
             self.annotations[self.current_frame] = []
 
-        point_name = self.point_combo.currentText()
+        point_name = self.point_combo.currentText().split(' (')[0]
         
         # Remove existing annotation for this point (if any)
         self.annotations[self.current_frame] = [p for p in self.annotations[self.current_frame] if p[0] != point_name]
@@ -200,21 +226,32 @@ def run_gui(video_list: List[str], skeleton_config: Dict):
     sys.exit(app.exec())
 
 def main():
+    parser = argparse.ArgumentParser(description="Fly Video Annotation Tool")
+    parser.add_argument("--config", required=False, type=str, default=None, help="Path to the skeleton configuration file (TOML)")
+    parser.add_argument("--folder", required=False, type=str, default=None, help="Path to the folder containing video files")
+    args = parser.parse_args()
+
     # Load skeleton configuration
-    skeleton_config_path = QFileDialog.getOpenFileName(None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)")[0]
-    if not skeleton_config_path:
-        print("No skeleton configuration file selected. Exiting.")
-        sys.exit(1)
+    if args.config == None:
+        skeleton_config_path = QFileDialog.getOpenFileName(None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)")[0]
+        if not skeleton_config_path:
+            print("No skeleton configuration file selected. Exiting.")
+            sys.exit(1)
+    else:
+        skeleton_config_path = args.config
     
     with open(skeleton_config_path, 'r') as skeleton_file:
         skeleton_config = toml.load(skeleton_file)
     
     # Load video list
-    video_list_path = QFileDialog.getOpenFileName(None, "Select Video List File", "", "CSV Files (*.csv)")[0]
-    if not skeleton_config_path:
-        print("No video list file selected. Exiting.")
-        sys.exit(1)
-    
+    if args.folder is None:
+        video_list_path = QFileDialog.getOpenFileName(None, "Select Video List File", "", "CSV Files (*.csv)")[0]
+        if not video_list_path:
+            print("No video list file selected. Exiting.")
+            sys.exit(1)
+    else:
+        video_list_path = args.folder
+        
     with open(video_list_path, 'r') as f:
         video_list = [line.strip() for line in f]
     
