@@ -1,4 +1,4 @@
-name: object-detection-env
+name: fly-video-filtering
 channels:
   - defaults
   - conda-forge
