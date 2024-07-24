@@ -63,9 +63,9 @@ def process_video(video_path, start_frame, end_frame, frame_perc, detection_meth
 def main():
     parser = argparse.ArgumentParser(description="Filter fly videos based on object detection")
     parser.add_argument("folder", help="Folder containing videos")
-    parser.add_argument("start_frame", type=int, help="Start frame for detection")
-    parser.add_argument("end_frame", type=int, help="End frame for detection")
-    parser.add_argument("frame_perc", type=float, help="Percentage of frames to detect object")
+    parser.add_argument("start_frame", type=int, default=450, help="Start frame for detection")
+    parser.add_argument("end_frame", type=int, default=650, help="End frame for detection")
+    parser.add_argument("frame_perc", type=float, default=90.0, help="Percentage of frames to detect object")
     parser.add_argument("--method", choices=['threshold', 'background_subtraction'], default='threshold', help="Detection method to use")
     parser.add_argument("--config", default='config.toml', help="Path to the configuration file")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
