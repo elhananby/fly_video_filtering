@@ -6,17 +6,17 @@ setup(
     packages=find_packages(),
     install_requires=[
         "opencv-python",
+        "numpy",
         "tqdm",
         "toml",
-        "PySide6",
+        "flask",
     ],
     package_data={
-        "fly_video_filtering": ["config/*.toml"],
+        "fly_video_filtering": ["config/*.toml", "web_annotation/templates/*", "web_annotation/static/js/*"],
     },
     entry_points={
         "console_scripts": [
             "fly_video_filter=fly_video_filtering.main:main",
-            "fly_video_annotate=fly_video_filtering.annotation.gui:run_annotation_gui",
         ],
     },
 )

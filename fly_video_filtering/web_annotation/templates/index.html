@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fly Video Annotation</title>
+    <style>
+        #videoContainer { position: relative; }
+        #annotationCanvas { position: absolute; top: 0; left: 0; }
+    </style>
+</head>
+<body>
+    <h1>Fly Video Annotation</h1>
+    <select id="videoSelect">
+        {% for video in videos %}
+            <option value="{{ video }}">{{ video }}</option>
+        {% endfor %}
+    </select>
+    <div id="videoContainer">
+        <img id="videoFrame" src="" alt="Video Frame">
+        <canvas id="annotationCanvas"></canvas>
+    </div>
+    <input type="range" id="frameSlider" min="0" max="100" value="0">
+    <input type="number" id="frameInput" min="0" value="0">
+    <button id="prevFrame">Previous Frame</button>
+    <button id="nextFrame">Next Frame</button>
+    <script src="{{ url_for('static', filename='js/annotator.js') }}"></script>
+</body>
+</html>

@@ -10,3 +10,5 @@ dependencies:
   - toml
   - pyside6
   - pip
+  - pip:
+    - ruff

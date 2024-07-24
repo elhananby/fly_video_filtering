@@ -5,6 +5,8 @@ import csv
 import toml
 import cv2
 from tqdm import tqdm
+from fly_video_filtering.web_annotation.app import start_server
+
 
 def detect_object_threshold(frame, min_area, threshold_value):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -15,6 +17,7 @@ def detect_object_threshold(frame, min_area, threshold_value):
             return True
     return False
 
+
 def detect_object_background_subtraction(frame, fgbg, min_area):
     fgmask = fgbg.apply(frame)
     contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -23,80 +26,132 @@ def detect_object_background_subtraction(frame, fgbg, min_area):
             return True
     return False
 
-def process_video(video_path, start_frame, end_frame, frame_perc, detection_method, config):
+
+def process_video(
+    video_path, start_frame, end_frame, frame_perc, detection_method, config
+):
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
+
     if end_frame > total_frames:
         end_frame = total_frames
-    
+
     frames_to_check = end_frame - start_frame + 1
     detections = 0
-    
+
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-    
-    if detection_method == 'background_subtraction':
+
+    if detection_method == "background_subtraction":
         fgbg = cv2.createBackgroundSubtractorMOG2(
-            history=config['background_subtraction']['history'],
-            varThreshold=config['background_subtraction']['var_threshold'],
-            detectShadows=config['background_subtraction']['detect_shadows']
+            history=config["background_subtraction"]["history"],
+            varThreshold=config["background_subtraction"]["var_threshold"],
+            detectShadows=config["background_subtraction"]["detect_shadows"],
         )
-    
-    for _ in tqdm(range(frames_to_check), desc=f"Processing {os.path.basename(video_path)}"):
+
+    for _ in tqdm(
+        range(frames_to_check), desc=f"Processing {os.path.basename(video_path)}"
+    ):
         ret, frame = cap.read()
         if not ret:
             break
-        
-        if detection_method == 'threshold':
-            if detect_object_threshold(frame, config['threshold']['min_area'], config['threshold']['threshold_value']):
+
+        if detection_method == "threshold":
+            if detect_object_threshold(
+                frame,
+                config["threshold"]["min_area"],
+                config["threshold"]["threshold_value"],
+            ):
                 detections += 1
-        elif detection_method == 'background_subtraction':
-            if detect_object_background_subtraction(frame, fgbg, config['background_subtraction']['min_area']):
+        elif detection_method == "background_subtraction":
+            if detect_object_background_subtraction(
+                frame, fgbg, config["background_subtraction"]["min_area"]
+            ):
                 detections += 1
-    
+
     cap.release()
-    
+
     detection_percentage = (detections / frames_to_check) * 100
     return detection_percentage >= frame_perc
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Filter fly videos based on object detection")
+    parser = argparse.ArgumentParser(description="Fly video filtering and annotation")
+    parser.add_argument(
+        "action", choices=["filter", "annotate"], help="Action to perform"
+    )
     parser.add_argument("folder", help="Folder containing videos")
     parser.add_argument("start_frame", type=int, help="Start frame for detection")
     parser.add_argument("end_frame", type=int, help="End frame for detection")
-    parser.add_argument("frame_perc", type=float, help="Percentage of frames to detect object")
-    parser.add_argument("--method", choices=['threshold', 'background_subtraction'], default='threshold', help="Detection method to use")
-    parser.add_argument("--config", default=os.path.join(os.path.dirname(__file__), 'config', 'config.toml'), help="Path to the configuration file")
+    parser.add_argument(
+        "frame_perc", type=float, help="Percentage of frames to detect object"
+    )
+    parser.add_argument(
+        "--method",
+        choices=["threshold", "background_subtraction"],
+        default="threshold",
+        help="Detection method to use",
+    )
+    parser.add_argument(
+        "--config",
+        default=os.path.join(os.path.dirname(__file__), "config", "config.toml"),
+        help="Path to the configuration file",
+    )
+    parser.add_argument(
+        "--skeleton",
+        default=os.path.join(os.path.dirname(__file__), "config", "skeleton.toml"),
+        help="Path to the skeleton configuration file",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    
+
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Load configuration
-    with open(args.config, 'r') as config_file:
-        config = toml.load(config_file)
+    if args.action == "filter":
+        # Load configuration
+        with open(args.config, "r") as config_file:
+            config = toml.load(config_file)
 
-    output_file = os.path.join(args.folder, 'detected_videos.csv')
-    
-    with open(output_file, 'w', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(['video_path'])
-        
-        video_files = [f for f in os.listdir(args.folder) if f.endswith(('.mp4', '.avi', '.mov'))]
-        
-        for video_file in tqdm(video_files, desc="Processing videos"):
-            video_path = os.path.join(args.folder, video_file)
-            logger.info(f"Processing video: {video_path}")
-            
-            if process_video(video_path, args.start_frame, args.end_frame, args.frame_perc, args.method, config):
-                logger.info(f"Object detected in {video_path}")
-                csv_writer.writerow([video_path])
-            else:
-                logger.info(f"Object not detected in {video_path}")
+        output_file = os.path.join(args.folder, "detected_videos.csv")
 
-    logger.info(f"Results saved to {output_file}")
+        with open(output_file, "w", newline="") as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(["video_path"])
+
+            video_files = [
+                f
+                for f in os.listdir(args.folder)
+                if f.endswith((".mp4", ".avi", ".mov"))
+            ]
+
+            for video_file in tqdm(video_files, desc="Processing videos"):
+                video_path = os.path.join(args.folder, video_file)
+                logger.info(f"Processing video: {video_path}")
+
+                if process_video(
+                    video_path,
+                    args.start_frame,
+                    args.end_frame,
+                    args.frame_perc,
+                    args.method,
+                    config,
+                ):
+                    logger.info(f"Object detected in {video_path}")
+                    csv_writer.writerow([video_path])
+                else:
+                    logger.info(f"Object not detected in {video_path}")
+
+        logger.info(f"Results saved to {output_file}")
+    elif args.action == "annotate":
+        with open(args.skeleton, "r") as skeleton_file:
+            skeleton_config = toml.load(skeleton_file)
+
+        with open(os.path.join(args.folder, "detected_videos.csv"), "r") as f:
+            video_list = [os.path.join(args.folder, line.strip()) for line in f]
+
+        start_server(video_list, skeleton_config)
+
 
 if __name__ == "__main__":
     main()
