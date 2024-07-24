@@ -17,6 +17,7 @@ setup(
     entry_points={
         "console_scripts": [
             "fly_video_filter=fly_video_filtering.main:main",
+            "fly_video_annotate=fly_video_filtering.web_annotation.app:main",
         ],
     },
 )

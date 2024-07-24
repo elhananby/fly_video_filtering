@@ -9,6 +9,7 @@ dependencies:
   - tqdm
   - toml
   - pyside6
+  - flask
   - pip
   - pip:
     - ruff

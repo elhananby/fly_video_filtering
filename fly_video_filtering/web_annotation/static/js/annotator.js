@@ -1,5 +1,5 @@
 let currentFrame = 0;
-let totalFrames = 0;
+let totalFrames = 100;  // Default value for debug mode
 let currentVideo = null;
 let skeletonConfig = null;
 let currentPointIndex = 0;
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            totalFrames = data.total_frames;
+            totalFrames = data.total_frames || 100;  // Use 100 frames if not specified (for debug mode)
             frameSlider.max = totalFrames - 1;
             frameInput.max = totalFrames - 1;
             currentFrame = 0;

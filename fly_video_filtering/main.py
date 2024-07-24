@@ -5,8 +5,6 @@ import csv
 import toml
 import cv2
 from tqdm import tqdm
-from fly_video_filtering.web_annotation.app import start_server
-
 
 def detect_object_threshold(frame, min_area, threshold_value):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -76,9 +74,6 @@ def process_video(
 
 def main():
     parser = argparse.ArgumentParser(description="Fly video filtering and annotation")
-    parser.add_argument(
-        "action", choices=["filter", "annotate"], help="Action to perform"
-    )
     parser.add_argument("folder", help="Folder containing videos")
     parser.add_argument("start_frame", type=int, help="Start frame for detection")
     parser.add_argument("end_frame", type=int, help="End frame for detection")
@@ -108,50 +103,40 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     logger = logging.getLogger(__name__)
 
-    if args.action == "filter":
-        # Load configuration
-        with open(args.config, "r") as config_file:
-            config = toml.load(config_file)
+    # Load configuration
+    with open(args.config, "r") as config_file:
+        config = toml.load(config_file)
 
-        output_file = os.path.join(args.folder, "detected_videos.csv")
+    output_file = os.path.join(args.folder, "detected_videos.csv")
 
-        with open(output_file, "w", newline="") as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(["video_path"])
+    with open(output_file, "w", newline="") as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(["video_path"])
 
-            video_files = [
-                f
-                for f in os.listdir(args.folder)
-                if f.endswith((".mp4", ".avi", ".mov"))
-            ]
+        video_files = [
+            f
+            for f in os.listdir(args.folder)
+            if f.endswith((".mp4", ".avi", ".mov"))
+        ]
 
-            for video_file in tqdm(video_files, desc="Processing videos"):
-                video_path = os.path.join(args.folder, video_file)
-                logger.info(f"Processing video: {video_path}")
+        for video_file in tqdm(video_files, desc="Processing videos"):
+            video_path = os.path.join(args.folder, video_file)
+            logger.info(f"Processing video: {video_path}")
 
-                if process_video(
-                    video_path,
-                    args.start_frame,
-                    args.end_frame,
-                    args.frame_perc,
-                    args.method,
-                    config,
-                ):
-                    logger.info(f"Object detected in {video_path}")
-                    csv_writer.writerow([video_path])
-                else:
-                    logger.info(f"Object not detected in {video_path}")
+            if process_video(
+                video_path,
+                args.start_frame,
+                args.end_frame,
+                args.frame_perc,
+                args.method,
+                config,
+            ):
+                logger.info(f"Object detected in {video_path}")
+                csv_writer.writerow([video_path])
+            else:
+                logger.info(f"Object not detected in {video_path}")
 
-        logger.info(f"Results saved to {output_file}")
-    elif args.action == "annotate":
-        with open(args.skeleton, "r") as skeleton_file:
-            skeleton_config = toml.load(skeleton_file)
-
-        with open(os.path.join(args.folder, "detected_videos.csv"), "r") as f:
-            video_list = [os.path.join(args.folder, line.strip()) for line in f]
-
-        start_server(video_list, skeleton_config)
-
+    logger.info(f"Results saved to {output_file}")
 
 if __name__ == "__main__":
     main()
