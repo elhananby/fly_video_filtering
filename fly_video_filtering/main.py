@@ -1,15 +1,14 @@
-import cv2
-import os
-import csv
 import argparse
 import logging
-from tqdm import tqdm
+import os
+import csv
 import toml
-import pkg_resources
+import cv2
+from tqdm import tqdm
 
 def detect_object_threshold(frame, min_area, threshold_value):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY_INV)
+    _, binary = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for contour in contours:
         if cv2.contourArea(contour) > min_area:
@@ -63,38 +62,21 @@ def process_video(video_path, start_frame, end_frame, frame_perc, detection_meth
 def main():
     parser = argparse.ArgumentParser(description="Filter fly videos based on object detection")
     parser.add_argument("folder", help="Folder containing videos")
-    parser.add_argument("start_frame", type=int, default=450, help="Start frame for detection")
-    parser.add_argument("end_frame", type=int, default=650, help="End frame for detection")
-    parser.add_argument("frame_perc", type=float, default=90.0, help="Percentage of frames to detect object")
+    parser.add_argument("start_frame", type=int, help="Start frame for detection")
+    parser.add_argument("end_frame", type=int, help="End frame for detection")
+    parser.add_argument("frame_perc", type=float, help="Percentage of frames to detect object")
     parser.add_argument("--method", choices=['threshold', 'background_subtraction'], default='threshold', help="Detection method to use")
-    parser.add_argument("--config", default='config.toml', help="Path to the configuration file")
+    parser.add_argument("--config", default=os.path.join(os.path.dirname(__file__), 'config', 'config.toml'), help="Path to the configuration file")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO if not args.debug else logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     logger = logging.getLogger(__name__)
-    
-    # Look for config file in multiple locations
-    config_locations = [
-        args.config,  # User-specified location
-        'config.toml',  # Current directory
-        pkg_resources.resource_filename('fly_video_filtering', 'config/config.toml')  # Package directory
-    ]
-    
-    config = None
-    for loc in config_locations:
-        try:
-            with open(loc, 'r') as config_file:
-                config = toml.load(config_file)
-            logger.info(f"Using configuration file: {loc}")
-            break
-        except FileNotFoundError:
-            continue
-    
-    if config is None:
-        logger.error("No configuration file found. Please provide a valid config.toml file.")
-        return
+
+    # Load configuration
+    with open(args.config, 'r') as config_file:
+        config = toml.load(config_file)
 
     output_file = os.path.join(args.folder, 'detected_videos.csv')
     
@@ -113,6 +95,8 @@ def main():
                 csv_writer.writerow([video_path])
             else:
                 logger.info(f"Object not detected in {video_path}")
+
+    logger.info(f"Results saved to {output_file}")
 
 if __name__ == "__main__":
     main()

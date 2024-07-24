@@ -1,6 +1,9 @@
-# Fly Video Filtering
+# Fly Video Filtering and Annotation Tool
 
-This Python package processes a folder of fly videos to detect flies within specified frame ranges using OpenCV. It supports two detection methods: thresholding and background subtraction. The script outputs a CSV file listing videos where objects were detected in at least a specified percentage of frames.
+This project provides tools for filtering fly videos based on object detection and annotating the filtered videos. It consists of two main components:
+
+1. A video filtering tool that processes videos to detect fly movement
+2. An annotation tool with a graphical user interface for marking specific points on flies in the filtered videos
 
 ## Installation
 
@@ -13,65 +16,68 @@ This Python package processes a folder of fly videos to detect flies within spec
 2. Create and activate the Conda environment:
    ```
    conda env create -f environment.yml
-   conda activate fly-video-filtering-env
+   conda activate fly-video-filtering
    ```
 
-3. Install the package:
+3. Install the package in editable mode:
    ```
    pip install -e .
    ```
 
 ## Usage
 
-Run the fly video filtering script with the following command:
+### Video Filtering
+
+To filter videos based on fly movement:
 
 ```
-filter_fly_videos /path/to/video/folder start_frame end_frame frame_percentage --method [threshold|background_subtraction] --config path/to/config.toml
+fly_video_filter /path/to/videos start_frame end_frame detection_percentage [--method {threshold|background_subtraction}] [--config path/to/config.toml]
 ```
 
 Arguments:
-- `/path/to/video/folder`: Directory containing the fly videos to process
+- `/path/to/videos`: Directory containing the videos to process
 - `start_frame`: Frame number to start detection (integer)
 - `end_frame`: Frame number to end detection (integer)
-- `frame_percentage`: Minimum percentage of frames that must contain an object (float)
+- `detection_percentage`: Minimum percentage of frames that must contain detected movement (float)
+
+Options:
 - `--method`: Detection method to use (choices: 'threshold' or 'background_subtraction', default: 'threshold')
-- `--config`: Path to the configuration file (default: 'config.toml')
+- `--config`: Path to a custom configuration file (default: package's config.toml)
 
 Example:
 ```
-filter_fly_videos /home/user/fly_videos 10 100 50.0 --method background_subtraction --config my_config.toml
+fly_video_filter /home/user/fly_videos 500 650 90.0 --method background_subtraction
 ```
 
-This will process all videos in `/home/user/fly_videos`, checking frames 10-100 for objects (flies) using the background subtraction method. Videos with objects detected in at least 50% of these frames will be listed in the output CSV.
+This command will process all videos in `/home/user/fly_videos`, checking frames 500-650 for fly movement using the background subtraction method. Videos with movement detected in at least 90% of these frames will be listed in the output CSV.
+
+### Video Annotation
+
+To run the annotation tool:
+
+```
+fly_video_annotate
+```
+
+This will open a file dialog to select:
+1. The skeleton configuration file (skeleton.toml)
+2. The CSV file containing the list of filtered videos
+
+The GUI will then allow you to:
+- Select videos from the list
+- Navigate through video frames
+- Annotate specific points on the fly (as defined in the skeleton.toml)
+- Save annotations automatically
 
 ## Configuration
 
-The `config.toml` file contains parameters for both detection methods. You can modify these values to adjust the sensitivity of the object detection.
+### Video Filtering Configuration (config.toml)
 
-The script looks for the configuration file in the following order:
-1. The location specified by the `--config` argument
-2. A `config.toml` file in the current directory
-3. The default configuration file installed with the package
+The `config.toml` file in the `fly_video_filtering/config/` directory contains parameters for both detection methods. You can modify these values to adjust the sensitivity of the object detection.
 
-You can create your own `config.toml` file in your project directory or specify a custom location using the `--config` argument. If no configuration file is found, the script will use the default configuration installed with the package.
+### Annotation Configuration (skeleton.toml)
 
-Example `config.toml`:
-
-```toml
-[threshold]
-min_area = 500
-threshold_value = 127
-
-[background_subtraction]
-min_area = 500
-history = 500
-var_threshold = 16
-detect_shadows = true
-```
-
-## Output
-
-The script generates a CSV file named `detected_videos.csv` in the input folder, listing paths of videos meeting the detection criteria.
+The `skeleton.toml` file defines the points to be annotated on each fly. Modify this file to change the number or names of annotation points.
 
 ## Development
 

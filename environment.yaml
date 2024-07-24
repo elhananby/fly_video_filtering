@@ -1,12 +1,14 @@
 name: fly-video-filtering-env
 channels:
-  - defaults
   - conda-forge
+  - defaults
 dependencies:
   - python
   - opencv
+  - numpy
   - tqdm
   - toml
+  - pyside6
   - pip
   - pip:
     - opencv-python

@@ -8,13 +8,15 @@ setup(
         "opencv-python",
         "tqdm",
         "toml",
+        "PySide6",
     ],
     package_data={
-        "fly_video_filtering": ["config/config.toml"],
+        "fly_video_filtering": ["config/*.toml"],
     },
     entry_points={
         "console_scripts": [
-            "filter_fly_videos=fly_video_filtering.main:main",
+            "fly_video_filter=fly_video_filtering.main:main",
+            "fly_video_annotate=fly_video_filtering.annotation.gui:run_annotation_gui",
         ],
     },
 )
