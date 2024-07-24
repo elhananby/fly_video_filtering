@@ -7,10 +7,14 @@ setup(
     install_requires=[
         "opencv-python",
         "tqdm",
+        "toml",
     ],
+    package_data={
+        "fly_video_filtering": ["config/config.toml"],
+    },
     entry_points={
         "console_scripts": [
-            "detect_objects=fly_video_filtering.main:main",
+            "filter_fly_videos=fly_video_filtering.main:main",
         ],
     },
 )

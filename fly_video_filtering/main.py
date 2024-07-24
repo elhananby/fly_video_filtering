@@ -5,6 +5,7 @@ import argparse
 import logging
 from tqdm import tqdm
 import toml
+import pkg_resources
 
 def detect_object_threshold(frame, min_area, threshold_value):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -59,13 +60,42 @@ def process_video(video_path, start_frame, end_frame, frame_perc, detection_meth
     detection_percentage = (detections / frames_to_check) * 100
     return detection_percentage >= frame_perc
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(description="Filter fly videos based on object detection")
+    parser.add_argument("folder", help="Folder containing videos")
+    parser.add_argument("start_frame", type=int, help="Start frame for detection")
+    parser.add_argument("end_frame", type=int, help="End frame for detection")
+    parser.add_argument("frame_perc", type=float, help="Percentage of frames to detect object")
+    parser.add_argument("--method", choices=['threshold', 'background_subtraction'], default='threshold', help="Detection method to use")
+    parser.add_argument("--config", default='config.toml', help="Path to the configuration file")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    
+    args = parser.parse_args()
+
     logging.basicConfig(level=logging.INFO if not args.debug else logging.DEBUG)
     logger = logging.getLogger(__name__)
     
-    with open(args.config, 'r') as config_file:
-        config = toml.load(config_file)
+    # Look for config file in multiple locations
+    config_locations = [
+        args.config,  # User-specified location
+        'config.toml',  # Current directory
+        pkg_resources.resource_filename('fly_video_filtering', 'config/config.toml')  # Package directory
+    ]
     
+    config = None
+    for loc in config_locations:
+        try:
+            with open(loc, 'r') as config_file:
+                config = toml.load(config_file)
+            logger.info(f"Using configuration file: {loc}")
+            break
+        except FileNotFoundError:
+            continue
+    
+    if config is None:
+        logger.error("No configuration file found. Please provide a valid config.toml file.")
+        return
+
     output_file = os.path.join(args.folder, 'detected_videos.csv')
     
     with open(output_file, 'w', newline='') as csvfile:
@@ -85,14 +115,4 @@ def main(args):
                 logger.info(f"Object not detected in {video_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Detect objects in videos")
-    parser.add_argument("folder", help="Folder containing videos")
-    parser.add_argument("start_frame", type=int, help="Start frame for detection")
-    parser.add_argument("end_frame", type=int, help="End frame for detection")
-    parser.add_argument("frame_perc", type=float, help="Percentage of frames to detect object")
-    parser.add_argument("--method", choices=['threshold', 'background_subtraction'], default='threshold', help="Detection method to use")
-    parser.add_argument("--config", default='config.toml', help="Path to the configuration file")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    
-    args = parser.parse_args()
-    main(args)
+    main()
