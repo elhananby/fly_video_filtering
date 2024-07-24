@@ -9,14 +9,14 @@ This project provides tools for filtering fly videos based on object detection a
 
 1. Clone this repository:
    ```
-   git clone https://github.com/yourusername/fly_video_filtering.git
+   git clone https://github.com/elhananby/fly_video_filtering.git
    cd fly_video_filtering
    ```
 
 2. Create and activate the Conda environment:
    ```
    conda env create -f environment.yml
-   conda activate fly-video-filtering
+   conda activate fly-video-filtering-env
    ```
 
 3. Install the package in editable mode:
@@ -56,20 +56,29 @@ This command will process all videos in `/home/user/fly_videos`, checking frames
 To run the annotation tool:
 
 ```
-fly_video_annotate
+fly_video_annotate [--config path/to/skeleton.toml] [--video-list path/to/video_list.csv]
 ```
 
-This will open a file dialog to select:
-1. The skeleton configuration file (skeleton.toml)
-2. The CSV file containing the list of filtered videos
+Options:
+- `--config`: Path to the skeleton configuration file (TOML format)
+- `--video-list`: Path to the file containing the list of videos to annotate (CSV format)
 
-The GUI will then allow you to:
+If either option is not provided, the tool will open a file dialog for you to select the respective file.
+
+Example:
+```
+fly_video_annotate --config /path/to/skeleton.toml --video-list /path/to/video_list.csv
+```
+
+The GUI allows you to:
 - Select videos from the list
-- Navigate through video frames
-- Annotate specific points on the fly (as defined in the skeleton.toml)
-- Save annotations automatically
+- Navigate through video frames using a slider or input box
+- Zoom in/out of the video frame using the mouse wheel
+- Select points to annotate from a dropdown menu
+- Annotate specific points on the fly by clicking on the video frame
+- Automatically save annotations as you work
 
-## Configuration
+## Configuration Files
 
 ### Video Filtering Configuration (config.toml)
 
@@ -77,7 +86,25 @@ The `config.toml` file in the `fly_video_filtering/config/` directory contains p
 
 ### Annotation Configuration (skeleton.toml)
 
-The `skeleton.toml` file defines the points to be annotated on each fly. Modify this file to change the number or names of annotation points.
+The `skeleton.toml` file defines the points to be annotated on each fly. Example format:
+
+```toml
+[fly]
+points = [
+  { name = "head", color = "red" },
+  { name = "thorax", color = "green" },
+  { name = "abdomen", color = "blue" },
+  { name = "wing_left" },
+  { name = "wing_right" }
+]
+```
+
+- You can specify colors as simple strings (e.g., "red", "green", "blue").
+- If a color is not specified for a point, the tool will automatically assign one.
+
+## Output
+
+The annotation tool saves a CSV file for each video, containing the frame number and coordinates for each annotated point.
 
 ## Development
 
