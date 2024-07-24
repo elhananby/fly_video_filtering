@@ -5,7 +5,7 @@ import cv2
 import toml
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QListWidget, QLabel, QSlider, QLineEdit, QFileDialog,
-                               QMessageBox)
+                               QMessageBox, QComboBox)
 from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
 from PySide6.QtCore import Qt, QPoint
 
@@ -40,7 +40,16 @@ class AnnotationGUI(QMainWindow):
         self.video_list_widget = QListWidget()
         self.video_list_widget.addItems(self.video_list)
         self.video_list_widget.itemClicked.connect(self.load_video)
+        left_layout.addWidget(QLabel("Videos:"))
         left_layout.addWidget(self.video_list_widget)
+
+        # Point selection
+        self.point_combo = QComboBox()
+        self.point_combo.addItems([point['name'] for point in self.skeleton_config['fly']['points']])
+        self.point_combo.currentIndexChanged.connect(self.update_current_point)
+        left_layout.addWidget(QLabel("Select point to annotate:"))
+        left_layout.addWidget(self.point_combo)
+
         left_panel.setLayout(left_layout)
 
         # Right panel
@@ -62,15 +71,6 @@ class AnnotationGUI(QMainWindow):
         nav_layout.addWidget(self.frame_input)
         right_layout.addLayout(nav_layout)
 
-        # Annotation controls
-        annotation_layout = QHBoxLayout()
-        self.current_point_label = QLabel("Current Point: ")
-        annotation_layout.addWidget(self.current_point_label)
-        self.remove_point_button = QPushButton("Remove Point")
-        self.remove_point_button.clicked.connect(self.remove_current_point)
-        annotation_layout.addWidget(self.remove_point_button)
-        right_layout.addLayout(annotation_layout)
-
         right_panel.setLayout(right_layout)
 
         main_layout.addWidget(left_panel, 1)
@@ -81,7 +81,6 @@ class AnnotationGUI(QMainWindow):
 
         self.video_label.mousePressEvent = self.annotate_point
         self.video_label.wheelEvent = self.zoom_image
-        self.video_label.mouseMoveEvent = self.pan_image
 
     def load_video(self, item):
         if self.current_video:
@@ -91,7 +90,8 @@ class AnnotationGUI(QMainWindow):
         self.cap = cv2.VideoCapture(self.current_video)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.frame_slider.setRange(0, self.total_frames - 1)
-        self.current_frame = 0
+        self.current_frame = 0  # Reset to frame 0
+        self.frame_slider.setValue(0)  # Reset slider to 0
         self.annotations = {}
         self.load_existing_annotations()
         self.update_frame()
@@ -106,7 +106,6 @@ class AnnotationGUI(QMainWindow):
         if ret:
             self.display_frame(frame)
         self.frame_input.setText(str(self.current_frame))
-        self.update_current_point_label()
 
     def display_frame(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -120,8 +119,9 @@ class AnnotationGUI(QMainWindow):
                                       Qt.KeepAspectRatio, Qt.SmoothTransformation)
         
         painter = QPainter(scaled_pixmap)
-        for point_name, x, y in self.annotations.get(self.current_frame, []):
-            color = QColor(self.skeleton_config['fly']['points'][point_name]['color'])
+        for point in self.annotations.get(self.current_frame, []):
+            point_name, x, y = point
+            color = self.get_point_color(point_name)
             pen = QPen(color)
             pen.setWidth(3)
             painter.setPen(pen)
@@ -130,36 +130,43 @@ class AnnotationGUI(QMainWindow):
 
         self.video_label.setPixmap(scaled_pixmap)
 
+    def get_point_color(self, point_name):
+        for point in self.skeleton_config['fly']['points']:
+            if point['name'] == point_name:
+                return QColor(point['color'])
+        return QColor(Qt.red)  # Default color if not found
+
     def annotate_point(self, event):
         if not self.cap:
             return
 
-        pos = event.pos()
+        pos = event.position()
         adjusted_x = (pos.x() - self.pan_offset.x()) / self.zoom_factor
         adjusted_y = (pos.y() - self.pan_offset.y()) / self.zoom_factor
 
         if self.current_frame not in self.annotations:
             self.annotations[self.current_frame] = []
 
-        point_name = self.skeleton_config['fly']['points'][self.current_point_index]['name']
+        point_name = self.point_combo.currentText()
+        
+        # Remove existing annotation for this point (if any)
+        self.annotations[self.current_frame] = [p for p in self.annotations[self.current_frame] if p[0] != point_name]
+        
+        # Add new annotation
         self.annotations[self.current_frame].append((point_name, int(adjusted_x), int(adjusted_y)))
-        self.current_point_index = (self.current_point_index + 1) % len(self.skeleton_config['fly']['points'])
+        
         self.update_frame()
         self.save_current_annotations()
+
+    def update_current_point(self, index):
+        self.current_point_index = index
 
     def zoom_image(self, event):
         if event.angleDelta().y() > 0:
             self.zoom_factor *= 1.1
         else:
             self.zoom_factor /= 1.1
-        self.zoom_factor = max(1.0, min(5.0, self.zoom_factor))  # Limit zoom between 1x and 5x
         self.update_frame()
-
-    def pan_image(self, event):
-        if event.buttons() == Qt.RightButton:
-            self.pan_offset += event.pos() - self.last_pan_pos
-            self.update_frame()
-        self.last_pan_pos = event.pos()
 
     def jump_to_frame(self):
         try:
@@ -179,32 +186,20 @@ class AnnotationGUI(QMainWindow):
         if os.path.exists(csv_path):
             self.annotations = load_annotations(csv_path)
 
-    def update_current_point_label(self):
-        if self.skeleton_config and 'fly' in self.skeleton_config and 'points' in self.skeleton_config['fly']:
-            current_point = self.skeleton_config['fly']['points'][self.current_point_index]['name']
-            self.current_point_label.setText(f"Current Point: {current_point}")
-
-    def remove_current_point(self):
-        if self.current_frame in self.annotations and self.annotations[self.current_frame]:
-            self.annotations[self.current_frame].pop()
-            self.update_frame()
-            self.save_current_annotations()
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Left:
             self.frame_slider.setValue(max(0, self.current_frame - 1))
         elif event.key() == Qt.Key_Right:
             self.frame_slider.setValue(min(self.total_frames - 1, self.current_frame + 1))
-        elif event.key() == Qt.Key_1:
-            self.current_point_index = 0
-        elif event.key() == Qt.Key_2:
-            self.current_point_index = 1
         # Add more shortcuts as needed
-        self.update_current_point_label()
 
-def run_annotation_gui():
+def run_gui(video_list: List[str], skeleton_config: Dict):
     app = QApplication(sys.argv)
-    
+    gui = AnnotationGUI(video_list, skeleton_config)
+    gui.show()
+    sys.exit(app.exec())
+
+def main():
     # Load skeleton configuration
     skeleton_config_path = QFileDialog.getOpenFileName(None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)")[0]
     if not skeleton_config_path:
@@ -216,16 +211,14 @@ def run_annotation_gui():
     
     # Load video list
     video_list_path = QFileDialog.getOpenFileName(None, "Select Video List File", "", "CSV Files (*.csv)")[0]
-    if not video_list_path:
+    if not skeleton_config_path:
         print("No video list file selected. Exiting.")
         sys.exit(1)
     
     with open(video_list_path, 'r') as f:
         video_list = [line.strip() for line in f]
     
-    gui = AnnotationGUI(video_list, skeleton_config)
-    gui.show()
-    sys.exit(app.exec())
+    run_gui(video_list, skeleton_config)
 
 if __name__ == "__main__":
-    run_annotation_gui()
+    main()

@@ -1,5 +1,5 @@
 [fly]
 points = [
-    { name = "head", color = "#FF0000" },
-    { name = "abdomen", color = "#00FF00" }
+  { name = "head", color = "#FF0000" },
+  { name = "abdomen", color = "#0000FF" }
 ]
