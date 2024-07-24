@@ -1,0 +1,12 @@
+name: object-detection-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python
+  - opencv
+  - tqdm
+  - toml
+  - pip
+  - pip:
+    - opencv-python
