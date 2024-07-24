@@ -10,5 +10,3 @@ dependencies:
   - toml
   - pyside6
   - pip
-  - pip:
-    - opencv-python
