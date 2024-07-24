@@ -227,35 +227,48 @@ def run_gui(video_list: List[str], skeleton_config: Dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Fly Video Annotation Tool")
-    parser.add_argument("--config", required=False, type=str, default=None, help="Path to the skeleton configuration file (TOML)")
-    parser.add_argument("--folder", required=False, type=str, default=None, help="Path to the folder containing video files")
+    parser.add_argument("--config", help="Path to the skeleton configuration file (TOML)")
+    parser.add_argument("--video-list", help="Path to the video list file (CSV)")
     args = parser.parse_args()
 
     # Load skeleton configuration
-    if args.config == None:
+    if args.config:
+        if not os.path.exists(args.config):
+            print(f"Error: Configuration file {args.config} not found.")
+            sys.exit(1)
+        skeleton_config_path = args.config
+    else:
         skeleton_config_path = QFileDialog.getOpenFileName(None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)")[0]
         if not skeleton_config_path:
             print("No skeleton configuration file selected. Exiting.")
             sys.exit(1)
-    else:
-        skeleton_config_path = args.config
-    
+
     with open(skeleton_config_path, 'r') as skeleton_file:
         skeleton_config = toml.load(skeleton_file)
-    
+
     # Load video list
-    if args.folder is None:
+    if args.video_list:
+        if not os.path.exists(args.video_list):
+            print(f"Error: Video list file {args.video_list} not found.")
+            sys.exit(1)
+        video_list_path = args.video_list
+    else:
         video_list_path = QFileDialog.getOpenFileName(None, "Select Video List File", "", "CSV Files (*.csv)")[0]
         if not video_list_path:
             print("No video list file selected. Exiting.")
             sys.exit(1)
-    else:
-        video_list_path = args.folder
-        
+
     with open(video_list_path, 'r') as f:
         video_list = [line.strip() for line in f]
-    
-    run_gui(video_list, skeleton_config)
+
+    if not video_list:
+        print("Error: No videos found in the video list file.")
+        sys.exit(1)
+
+    app = QApplication(sys.argv)
+    gui = AnnotationGUI(video_list, skeleton_config)
+    gui.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
