@@ -4,58 +4,69 @@ from typing import List, Dict, Tuple
 import cv2
 import toml
 import argparse
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                               QPushButton, QListWidget, QLabel, QSlider, QLineEdit, QFileDialog,
-                               QMessageBox, QComboBox)
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QFileDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QListWidget,
+    QLabel,
+    QSlider,
+    QLineEdit,
+    QComboBox,
+    QCheckBox,
+    QApplication,
+)
+from PySide6.QtGui import (
+    QImage,
+    QPixmap,
+    QPainter,
+    QPen,
+    QColor,
+    QGuiApplication,
+)
 from PySide6.QtCore import Qt, QPoint
 
 from fly_video_filtering.utils.annotation import save_annotations, load_annotations
 
 # Predefined colors for automatic assignment
-AUTO_COLORS = ['red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'black', 'white', 
-               'darkRed', 'darkGreen', 'darkBlue', 'darkCyan', 'darkMagenta', 'darkYellow']
+AUTO_COLORS = [
+    "red",
+    "green",
+    "blue",
+    "cyan",
+    "magenta",
+    "yellow",
+    "black",
+    "white",
+    "darkRed",
+    "darkGreen",
+    "darkBlue",
+    "darkCyan",
+    "darkMagenta",
+    "darkYellow",
+]
+
 
 class AnnotationGUI(QMainWindow):
     def __init__(self, video_list: List[str], skeleton_config: Dict):
         super().__init__()
         self.video_list = video_list
-        self.skeleton_config = self.process_skeleton_config(skeleton_config)
+        self.skeleton_config = skeleton_config
         self.current_video = None
         self.cap = None
         self.current_frame = 0
         self.total_frames = 0
         self.annotations = {}
-        self.current_point_index = 0
-        self.zoom_factor = 1.0
-        self.pan_offset = QPoint(0, 0)
+        self.auto_advance = False
 
         self.init_ui()
 
-    def process_skeleton_config(self, config):
-        points = config['fly']['points']
-        used_colors = set()
-        color_index = 0
-
-        for point in points:
-            if 'color' not in point or not point['color']:
-                while color_index < len(AUTO_COLORS):
-                    color = AUTO_COLORS[color_index]
-                    if color not in used_colors:
-                        point['color'] = color
-                        used_colors.add(color)
-                        break
-                    color_index += 1
-                if 'color' not in point:
-                    point['color'] = 'black'  # Fallback if all colors are used
-            else:
-                used_colors.add(point['color'])
-
-        return config
-
     def init_ui(self):
-        self.setWindowTitle('Fly Video Annotation')
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("Fly Video Annotation")
+        self.setFixedSize(1000, 700)  # Fixed window size
 
         main_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -71,10 +82,19 @@ class AnnotationGUI(QMainWindow):
 
         # Point selection
         self.point_combo = QComboBox()
-        self.point_combo.addItems([f"{point['name']} ({point['color']})" for point in self.skeleton_config['fly']['points']])
-        self.point_combo.currentIndexChanged.connect(self.update_current_point)
+        self.point_combo.addItems(
+            [
+                f"{point['name']} ({point['color']})"
+                for point in self.skeleton_config["fly"]["points"]
+            ]
+        )
         left_layout.addWidget(QLabel("Select point to annotate:"))
         left_layout.addWidget(self.point_combo)
+
+        # Auto-advance checkbox
+        self.auto_advance_checkbox = QCheckBox("Auto-advance to next point")
+        self.auto_advance_checkbox.stateChanged.connect(self.toggle_auto_advance)
+        left_layout.addWidget(self.auto_advance_checkbox)
 
         left_panel.setLayout(left_layout)
 
@@ -84,6 +104,8 @@ class AnnotationGUI(QMainWindow):
 
         # Video display
         self.video_label = QLabel()
+        self.video_label.setFixedSize(800, 600)  # Fixed video size
+        self.video_label.mousePressEvent = self.annotate_point
         right_layout.addWidget(self.video_label)
 
         # Frame navigation
@@ -99,14 +121,11 @@ class AnnotationGUI(QMainWindow):
 
         right_panel.setLayout(right_layout)
 
-        main_layout.addWidget(left_panel, 1)
-        main_layout.addWidget(right_panel, 3)
+        main_layout.addWidget(left_panel)
+        main_layout.addWidget(right_panel)
 
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
-
-        self.video_label.mousePressEvent = self.annotate_point
-        self.video_label.wheelEvent = self.zoom_image
 
     def load_video(self, item):
         if self.current_video:
@@ -116,8 +135,8 @@ class AnnotationGUI(QMainWindow):
         self.cap = cv2.VideoCapture(self.current_video)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.frame_slider.setRange(0, self.total_frames - 1)
-        self.current_frame = 0  # Reset to frame 0
-        self.frame_slider.setValue(0)  # Reset slider to 0
+        self.current_frame = 0
+        self.frame_slider.setValue(0)
         self.annotations = {}
         self.load_existing_annotations()
         self.update_frame()
@@ -135,64 +154,63 @@ class AnnotationGUI(QMainWindow):
 
     def display_frame(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_rgb = cv2.resize(frame_rgb, (800, 600))  # Resize to 800x600
         h, w, ch = frame_rgb.shape
         bytes_per_line = ch * w
         image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(image)
 
-        # Apply zoom and pan
-        scaled_pixmap = pixmap.scaled(pixmap.width() * self.zoom_factor, pixmap.height() * self.zoom_factor, 
-                                      Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        
-        painter = QPainter(scaled_pixmap)
+        painter = QPainter(pixmap)
         for point in self.annotations.get(self.current_frame, []):
             point_name, x, y = point
             color = self.get_point_color(point_name)
             pen = QPen(color)
             pen.setWidth(3)
             painter.setPen(pen)
-            painter.drawEllipse(QPoint(int(x * self.zoom_factor), int(y * self.zoom_factor)), 5, 5)
+            painter.drawEllipse(QPoint(x, y), 5, 5)
         painter.end()
 
-        self.video_label.setPixmap(scaled_pixmap)
-
-    def get_point_color(self, point_name):
-        for point in self.skeleton_config['fly']['points']:
-            if point['name'] == point_name:
-                return QColor(point['color'])
-        return QColor(Qt.red)  # Default color if not found
+        self.video_label.setPixmap(pixmap)
 
     def annotate_point(self, event):
         if not self.cap:
             return
 
         pos = event.position()
-        adjusted_x = (pos.x() - self.pan_offset.x()) / self.zoom_factor
-        adjusted_y = (pos.y() - self.pan_offset.y()) / self.zoom_factor
+        x = int(pos.x())
+        y = int(pos.y())
 
         if self.current_frame not in self.annotations:
             self.annotations[self.current_frame] = []
 
-        point_name = self.point_combo.currentText().split(' (')[0]
-        
+        point_name = self.point_combo.currentText().split(" (")[0]
+
         # Remove existing annotation for this point (if any)
-        self.annotations[self.current_frame] = [p for p in self.annotations[self.current_frame] if p[0] != point_name]
-        
+        self.annotations[self.current_frame] = [
+            p for p in self.annotations[self.current_frame] if p[0] != point_name
+        ]
+
         # Add new annotation
-        self.annotations[self.current_frame].append((point_name, int(adjusted_x), int(adjusted_y)))
-        
+        self.annotations[self.current_frame].append((point_name, x, y))
+
         self.update_frame()
         self.save_current_annotations()
 
-    def update_current_point(self, index):
-        self.current_point_index = index
+        # Auto-advance to next point if enabled
+        if self.auto_advance:
+            next_index = (
+                self.point_combo.currentIndex() + 1
+            ) % self.point_combo.count()
+            self.point_combo.setCurrentIndex(next_index)
 
-    def zoom_image(self, event):
-        if event.angleDelta().y() > 0:
-            self.zoom_factor *= 1.1
-        else:
-            self.zoom_factor /= 1.1
-        self.update_frame()
+    def get_point_color(self, point_name):
+        for point in self.skeleton_config["fly"]["points"]:
+            if point["name"] == point_name:
+                return QColor(point["color"])
+        return QColor(Qt.red)  # Default color if not found
+
+    def toggle_auto_advance(self, state):
+        self.auto_advance = state == Qt.Checked
 
     def jump_to_frame(self):
         try:
@@ -216,8 +234,11 @@ class AnnotationGUI(QMainWindow):
         if event.key() == Qt.Key_Left:
             self.frame_slider.setValue(max(0, self.current_frame - 1))
         elif event.key() == Qt.Key_Right:
-            self.frame_slider.setValue(min(self.total_frames - 1, self.current_frame + 1))
+            self.frame_slider.setValue(
+                min(self.total_frames - 1, self.current_frame + 1)
+            )
         # Add more shortcuts as needed
+
 
 def run_gui(video_list: List[str], skeleton_config: Dict):
     app = QApplication(sys.argv)
@@ -225,9 +246,15 @@ def run_gui(video_list: List[str], skeleton_config: Dict):
     gui.show()
     sys.exit(app.exec())
 
+
 def main():
+    # Create the QApplication instance first
+    app = QApplication(sys.argv)
+
     parser = argparse.ArgumentParser(description="Fly Video Annotation Tool")
-    parser.add_argument("--config", help="Path to the skeleton configuration file (TOML)")
+    parser.add_argument(
+        "--config", help="Path to the skeleton configuration file (TOML)"
+    )
     parser.add_argument("--video-list", help="Path to the video list file (CSV)")
     args = parser.parse_args()
 
@@ -238,12 +265,14 @@ def main():
             sys.exit(1)
         skeleton_config_path = args.config
     else:
-        skeleton_config_path = QFileDialog.getOpenFileName(None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)")[0]
+        skeleton_config_path = QFileDialog.getOpenFileName(
+            None, "Select Skeleton Configuration File", "", "TOML Files (*.toml)"
+        )[0]
         if not skeleton_config_path:
             print("No skeleton configuration file selected. Exiting.")
             sys.exit(1)
 
-    with open(skeleton_config_path, 'r') as skeleton_file:
+    with open(skeleton_config_path, "r") as skeleton_file:
         skeleton_config = toml.load(skeleton_file)
 
     # Load video list
@@ -253,22 +282,27 @@ def main():
             sys.exit(1)
         video_list_path = args.video_list
     else:
-        video_list_path = QFileDialog.getOpenFileName(None, "Select Video List File", "", "CSV Files (*.csv)")[0]
+        video_list_path = QFileDialog.getOpenFileName(
+            None, "Select Video List File", "", "CSV Files (*.csv)"
+        )[0]
         if not video_list_path:
             print("No video list file selected. Exiting.")
             sys.exit(1)
 
-    with open(video_list_path, 'r') as f:
+    with open(video_list_path, "r") as f:
         video_list = [line.strip() for line in f]
 
     if not video_list:
         print("Error: No videos found in the video list file.")
         sys.exit(1)
 
-    app = QApplication(sys.argv)
+    # Create and show the GUI
     gui = AnnotationGUI(video_list, skeleton_config)
     gui.show()
+
+    # Start the event loop
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

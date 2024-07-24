@@ -3,6 +3,7 @@ import tempfile
 import os
 from fly_video_filtering.main import process_video, detect_object
 
+
 class TestObjectDetection(unittest.TestCase):
     def test_detect_object(self):
         # This is a placeholder test since the actual implementation is not provided
@@ -15,7 +16,7 @@ class TestObjectDetection(unittest.TestCase):
 
         try:
             # Mock video creation (you may need to create an actual video file for real testing)
-            open(temp_video_path, 'w').close()
+            open(temp_video_path, "w").close()
 
             # Test the process_video function
             result = process_video(temp_video_path, 0, 10, 50.0)
@@ -25,5 +26,6 @@ class TestObjectDetection(unittest.TestCase):
             # Clean up the temporary file
             os.unlink(temp_video_path)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
