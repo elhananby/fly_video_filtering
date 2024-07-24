@@ -15,7 +15,7 @@ This project provides tools for filtering fly videos based on object detection a
 
 2. Create and activate the Conda environment:
    ```
-   conda env create -f environment.yml
+   conda env create -f environment.yaml
    conda activate fly-video-filtering-env
    ```
 
